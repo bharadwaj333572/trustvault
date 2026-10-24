@@ -37,4 +37,10 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Streaming File Downloads with Fresh Policy Check**: Instead of issuing signed S3 URLs (which cannot be revoked until expiry), files are proxied through `/api/documents/[id]/download`. Every download query evaluates `validateSession()` and `getDocumentWithAuthorization(..., 'download')` on the exact millisecond before reading disk bytes.
   - **SQL-Level Authorization Filtering**: We ensured `listAuthorizedDocuments` and `/api/search` execute the grant check directly in the SQL `WHERE` clause (`WHERE owner_id = :uid OR id IN (SELECT document_id FROM document_grants ...)`), preventing memory exhaustion or data leakage from client-side filtering.
 
+### Phase 4: Sharing and Immediate Revocation
+- **Uncertainty / Review Areas**:
+  - **Zero-Latency Invalidation**: By avoiding signed URLs or bearer download tokens, every stream and range request requires an active DB grant lookup. The trade-off is higher database read load during high-concurrency downloads, but it guarantees that revoked grants terminate instantaneously without any cache TTL lag.
+  - **Owner Self-Grant Prevention**: Checked that an owner cannot grant permissions to themselves, avoiding duplicate or conflicting ACL records.
+  - **User Disablement Cascade**: Disabling a user immediately executes `revokeAllUserSessions()`, destroying their active sessions and denying any subsequent API call with 401.
+
 ---
