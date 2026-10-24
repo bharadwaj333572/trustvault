@@ -55,4 +55,10 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Security Alerts Thresholds**: Implemented 5 clear, deterministic thresholds for "worth noticing" events: denied spikes ($\ge 3$ in 15 mins), odd hours (00:00-05:00 UTC), bulk downloads ($\ge 5$ in 10 mins), account lockouts, and revoked-user probes.
   - **CSV Export Escaping**: In the `/api/admin/audit?format=csv` stream, all fields are double-quoted and inner quotes are escaped (`""`) to prevent CSV injection / formula execution vulnerabilities.
 
+### Phase 7: AI Sharing Suggestions
+- **Uncertainty / Review Areas**:
+  - **Strict Content Decoupling**: Ensured the suggestion service receives only `{ category, ownerId }` metadata. It has zero access to storage keys, disk buffers, or document text contents.
+  - **Confirm-Only UX Boundary**: The suggestions endpoint strictly returns candidate recommendation objects to pre-fill client form fields. Under no circumstance does the suggestion route insert into `document_grants`. This was explicitly proved in `tests/security/ai-suggestions.test.ts`.
+  - **Auditing Advisory Interactions**: Added dedicated audit actions `SUGGESTION_SHOWN`, `SUGGESTION_ACCEPTED`, and `SUGGESTION_REJECTED` so auditors can track algorithmic suggestions and human confirmations.
+
 ---
