@@ -83,3 +83,55 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Zero-Config Clean Clone**: Tested that cloning the repository and running `npm install && npx tsx scripts/seed.ts && npm run dev` works with zero prerequisites or external database configuration due to embedded PGlite.
   - **Audit Trigger Portability**: Verified that while PGlite in WebAssembly/Node executes standard PostgreSQL `BEFORE UPDATE/DELETE` triggers, production deployments on standard PostgreSQL services (Render, Railway, Fly.io) will execute the identical triggers without modification.
   - **Honest Limitations Disclosure**: Documented known trade-offs in `README.md`, including the deliberate choice against complex group permissions and folder inheritance, absence of MFA, and lack of WebSocket pushes for revocations.
+
+---
+
+## Real Mistakes & Post-Mortem Log (Human Verified)
+
+### [2026-10-24 18:20] - Phase 1: Bulk Migration Engine
+- **Query / Task**: Run initial SQL schema migrations against database adapter.
+- **Result / Model Output**: Generated code called `rawClient.query(migrationSql)` with multi-statement SQL strings containing triggers and tables.
+- **Discrepancy / Weakness**: PGlite treats `.query()` as a prepared statement, which rejects multiple semicolons and transaction blocks with `syntax error at or near ";"`.
+- **Resolution**: Refactored `runMigrations()` in `src/server/db/migrate.ts` to branch on `'exec' in rawClient` using `.exec()` for multi-statement scripts.
+- **Commit Reference**: `d788f84`
+
+### [2026-10-24 18:35] - Phase 3: Magic-Byte Sniffing on Zip Containers
+- **Query / Task**: Implement upload file validation for DOCX, XLSX, and PPTX office documents.
+- **Result / Model Output**: Matched only initial 4 bytes `PK\x03\x04`.
+- **Discrepancy / Weakness**: Any generic zip archive or executable disguised as a zip would match `PK\x03\x04` and bypass type checks.
+- **Resolution**: Extended `detectMagicBytes()` in `src/server/validation/upload.ts` to inspect inner directory markers (`word/`, `xl/`, `ppt/`) in the first 2 KB.
+- **Commit Reference**: `14b1e23`
+
+### [2026-10-24 19:15] - Phase 9: Adversarial Attack Pass Parameter Mismatch
+- **Query / Task**: Run attack pass test validating upload buffer rejection.
+- **Result / Model Output**: Called `validateUploadedFile(emptyBuffer, 'empty.pdf')` with 2 arguments instead of 3.
+- **Discrepancy / Weakness**: TypeScript compiler threw TS2554 expecting `declaredSize: number` as the third parameter.
+- **Resolution**: Aligned all call sites to pass `(buffer, fileName, buffer.length)`.
+- **Commit Reference**: `9068285`
+
+---
+
+## Human Review Queue & Pending TODO Templates
+
+The following templates represent designated human post-mortem entries awaiting manual completion:
+
+### [TODO-DATE] - Phase A: Audit Hardening Human Review
+- **Query / Task**: TODO: Human reviewer prompt description
+- **Result / Model Output**: TODO: Model output summary
+- **Discrepancy / Weakness**: TODO: What was incorrect or needed manual intervention
+- **Resolution**: TODO: What was implemented
+- **Commit Reference**: `4d246b2`
+
+### [TODO-DATE] - Phase B: Authorisation Edge Cases Human Review
+- **Query / Task**: TODO: Human reviewer prompt description
+- **Result / Model Output**: TODO: Model output summary
+- **Discrepancy / Weakness**: TODO: What was incorrect or needed manual intervention
+- **Resolution**: TODO: What was implemented
+- **Commit Reference**: `96b7712`
+
+### [TODO-DATE] - Phase E: Product & UX Completion Human Review
+- **Query / Task**: TODO: Human reviewer prompt description
+- **Result / Model Output**: TODO: Model output summary
+- **Discrepancy / Weakness**: TODO: What was incorrect or needed manual intervention
+- **Resolution**: TODO: What was implemented
+- **Commit Reference**: TODO: commit hash
