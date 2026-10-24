@@ -1,0 +1,702 @@
+openapi: 3.0.3
+info:
+  title: TrustVault API Specification
+  description: >
+    TrustVault — Secure document sharing with a tamper-evident audit trail.
+    Adversarial authorization, immediate revocation, magic byte upload validation,
+    and cryptographic SHA-256 hash-chained audit logging.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development environment
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: trustvault_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Alternative Authorization header token for API clients
+
+  schemas:
+    AppError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: NOT_FOUND
+            message:
+              type: string
+              example: Document not found or access denied
+            details:
+              type: object
+              nullable: true
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, OWNER, VIEWER]
+        isDisabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        originalFileName:
+          type: string
+        mimeType:
+          type: string
+        fileSize:
+          type: integer
+        category:
+          type: string
+          enum: [FINANCIAL, LEGAL, HR, ENGINEERING, OPERATIONS, OTHER]
+        folderPath:
+          type: string
+        ownerId:
+          type: string
+          format: uuid
+        currentVersion:
+          type: integer
+        isDeleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    DocumentGrant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userEmail:
+          type: string
+        userName:
+          type: string
+        permission:
+          type: string
+          enum: [READ, EDIT]
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sequenceNumber:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        actorId:
+          type: string
+          format: uuid
+          nullable: true
+        actorEmail:
+          type: string
+          nullable: true
+        actorRole:
+          type: string
+          nullable: true
+        ipAddress:
+          type: string
+        documentId:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        outcome:
+          type: string
+          enum: [ALLOWED, DENIED]
+        reason:
+          type: string
+          nullable: true
+        prevHash:
+          type: string
+        hash:
+          type: string
+        metadata:
+          type: object
+          nullable: true
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [DENIED_SPIKE, ODD_HOURS_ACCESS, BULK_DOWNLOAD, ACCOUNT_LOCKOUT, REVOKED_USER_PROBE]
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+
+paths:
+  /api/auth/login:
+    post:
+      summary: User Login & Session Generation
+      description: Authenticates user credentials with Argon2id, creates opaque DB session, and sets HttpOnly cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Successfully authenticated
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppError'
+        '429':
+          description: Account lockout after 5 failed attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppError'
+
+  /api/auth/logout:
+    post:
+      summary: User Logout
+      description: Invalidates active session in database and clears session cookie.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully logged out
+
+  /api/auth/me:
+    get:
+      summary: Current Session Profile
+      description: Returns profile details for the active authenticated session.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthenticated
+
+  /api/documents:
+    get:
+      summary: List Authorized Documents
+      description: Returns documents owned by or explicitly granted to the authenticated user.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Document'
+
+    post:
+      summary: Upload Document
+      description: Uploads document payload with magic byte validation, calculates SHA-256 checksum, and records audit block.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                category:
+                  type: string
+                folderPath:
+                  type: string
+      responses:
+        '201':
+          description: Document successfully created
+        '400':
+          description: Invalid file magic bytes or empty payload
+        '403':
+          description: Viewers cannot upload documents
+
+  /api/documents/{id}:
+    get:
+      summary: Get Document Metadata
+      description: Evaluates `can(user, 'view', doc)`. Returns metadata or uniform 404.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document:
+                    $ref: '#/components/schemas/Document'
+        '404':
+          description: Not found or access denied (uniform response)
+
+    patch:
+      summary: Update Document Title & Metadata
+      description: Evaluates `can(user, 'edit', doc)`. Mass assignment fields (`ownerId`, `isDeleted`) are strictly ignored.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                category:
+                  type: string
+                folderPath:
+                  type: string
+      responses:
+        '200':
+          description: Successfully updated
+        '404':
+          description: Not found or unauthorized
+
+    delete:
+      summary: Soft Delete Document
+      description: Evaluates `can(user, 'delete', doc)`. Only document OWNER has delete permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Document soft deleted
+        '404':
+          description: Not found or unauthorized
+
+  /api/documents/{id}/download:
+    get:
+      summary: Stream Document Content
+      description: Evaluates `can(user, 'download', doc)` on EVERY request. Files stream with `Content-Disposition: attachment`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Binary file stream
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="audit_report.pdf"
+            X-Content-Type-Options:
+              schema:
+                type: string
+                example: nosniff
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Document not found or access denied
+
+  /api/documents/{id}/grants:
+    get:
+      summary: List Document Grants
+      description: Returns all active permissions granted on this document.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentGrant'
+
+    post:
+      summary: Grant Permission
+      description: Grants READ or EDIT permissions to a named email. Only OWNER can grant.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetEmail, permission]
+              properties:
+                targetEmail:
+                  type: string
+                  format: email
+                permission:
+                  type: string
+                  enum: [READ, EDIT]
+                expiresAt:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        '201':
+          description: Grant created
+        '404':
+          description: Not found or unauthorized
+
+  /api/documents/{id}/grants/{grantId}:
+    delete:
+      summary: Immediate Permission Revocation
+      description: Revokes grant instantly. Target user's very next download request is refused.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: grantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Grant revoked immediately
+        '404':
+          description: Not found or unauthorized
+
+  /api/documents/{id}/versions:
+    get:
+      summary: List Document Version History
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Version history list
+
+    post:
+      summary: Upload New Document Version
+      description: Increments version, validates payload, and updates storage key. Requires EDIT or OWNER.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '201':
+          description: New version uploaded
+
+  /api/documents/{id}/activity:
+    get:
+      summary: Document Activity Log
+      description: Returns audit entries specific to this document. Requires OWNER permission.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Activity records
+
+  /api/search:
+    get:
+      summary: Secure Document Search
+      description: Parameterized, paginated search enforcing authorization directly inside SQL. Never leaks cross-tenant results.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Search results
+
+  /api/suggestions:
+    get:
+      summary: AI Sharing Suggestions
+      description: Returns recommended grant recipients based on historical collaboration patterns. Zero document content analyzed.
+      parameters:
+        - name: documentId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Suggestion recipient chips
+
+  /api/suggestions/feedback:
+    post:
+      summary: Record Feedback on AI Suggestions
+      description: Logs `ai.suggestion_accepted` or `ai.suggestion_dismissed` in the immutable audit trail.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Feedback recorded
+
+  /api/admin/audit:
+    get:
+      summary: Global Audit Explorer & CSV Export
+      description: Administrative view of all system actions. Supports `?format=csv` export.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Audit log items or CSV file
+        '403':
+          description: Admin privilege required
+
+  /api/admin/audit/verify:
+    get:
+      summary: Verify Audit Chain Status
+      description: Recomputes entire SHA-256 hash chain and returns status badge metadata.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Chain integrity status
+    post:
+      summary: Trigger Audit Chain Verification
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Full chain audit results
+
+  /api/admin/alerts:
+    get:
+      summary: Security Heuristic Alerts
+      description: Returns active behavioral threat detections (denied spikes, odd hours, bulk downloads, revoked probes).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of active alerts
+
+  /api/admin/users:
+    get:
+      summary: List All Users
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User directory
+
+  /api/admin/users/{id}:
+    patch:
+      summary: Update User Status or Role
+      description: Allows disabling users or changing roles. Disabling a user immediately purges all active DB sessions.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [ADMIN, OWNER, VIEWER]
+                isDisabled:
+                  type: boolean
+      responses:
+        '200':
+          description: User updated and sessions purged if disabled

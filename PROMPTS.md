@@ -69,3 +69,17 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Uniform 404 UI**: Document detail routes and the custom Next.js 404 page emit identical layouts for both missing and forbidden documents.
 
 ---
+
+### Phase 9: Adversarial Attack Pass & Mutation Checking
+- **Uncertainty / Review Areas**:
+  - **Mutation Testing Verification**: Built `scripts/mutation-check.ts` to simulate an attacker bypassing the policy check by flipping the default DENY rule to `return { allowed: true }`. Confirmed our test suite caught the mutation immediately and aborted with exit code 1.
+  - **Uniform 404 Timing and Payload Shape**: Validated that `UniformNotFoundOrForbiddenError` produces byte-for-byte identical HTTP 404 responses for non-existent document IDs vs existing document IDs where the actor lacks permission, eliminating timing and status enumeration attacks.
+  - **Mass Assignment Defenses**: Tested that client payloads sending `ownerId`, `isDeleted`, or `userId` in `POST /api/documents` or `PATCH /api/documents/[id]` are completely discarded by the server handlers.
+  - **Admin Content Isolation**: Confirmed via dedicated adversarial attack tests that Admin accounts attempting to invoke download or view on documents owned by others receive 404 Not Found.
+  - **Audit Completeness**: Verified that all failed/denied requests trigger a synchronous insert into `audit_logs` with `outcome: 'DENIED'` and `action: 'DENIED_ATTEMPT'`.
+
+### Phase 10: Documentation, Packaging & Production Readiness
+- **Uncertainty / Review Areas**:
+  - **Zero-Config Clean Clone**: Tested that cloning the repository and running `npm install && npx tsx scripts/seed.ts && npm run dev` works with zero prerequisites or external database configuration due to embedded PGlite.
+  - **Audit Trigger Portability**: Verified that while PGlite in WebAssembly/Node executes standard PostgreSQL `BEFORE UPDATE/DELETE` triggers, production deployments on standard PostgreSQL services (Render, Railway, Fly.io) will execute the identical triggers without modification.
+  - **Honest Limitations Disclosure**: Documented known trade-offs in `README.md`, including the deliberate choice against complex group permissions and folder inheritance, absence of MFA, and lack of WebSocket pushes for revocations.
