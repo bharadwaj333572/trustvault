@@ -3,7 +3,9 @@ import { revokeSession, SESSION_COOKIE_NAME, validateSession } from '@/server/au
 import { logAuditEvent } from '@/server/services/audit';
 
 export async function POST(req: NextRequest) {
-  const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const cookieToken = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const authHeader = req.headers.get('authorization');
+  const token = cookieToken || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined);
   const ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
   const userAgent = req.headers.get('user-agent') || 'unknown';
 

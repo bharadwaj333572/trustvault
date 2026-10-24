@@ -242,6 +242,10 @@ describe('PHASE A: Audit Hardening & Cryptographic Integrity', () => {
         methods: ['GET'],
         auditedActions: ['document.download', 'DOWNLOAD', 'DENIED_ATTEMPT'],
       },
+      'api/documents/[id]/restore': {
+        methods: ['POST'],
+        auditedActions: ['document.restore', 'RESTORE', 'DENIED_ATTEMPT'],
+      },
       'api/documents/[id]/grants': {
         methods: ['POST'],
         auditedActions: ['grant.created', 'GRANT', 'DENIED_ATTEMPT'],
@@ -323,6 +327,7 @@ describe('PHASE A: Audit Hardening & Cryptographic Integrity', () => {
             fileContent.includes('getSharingSuggestions') ||
             fileContent.includes('createDocumentVersion') ||
             fileContent.includes('softDeleteDocument') ||
+            fileContent.includes('restoreDocument') ||
             fileContent.includes('recordSuggestionFeedback');
 
           expect(

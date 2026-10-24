@@ -78,6 +78,10 @@ export async function createDocumentGrant(
     throw new ValidationError('You already have implicit full control over your own document.');
   }
 
+  if (targetUser.isDisabled) {
+    throw new ValidationError(`Cannot grant permissions to disabled user account "${normalizedEmail}".`);
+  }
+
   const now = new Date();
   const expiresAtDate = input.expiresAt ? new Date(input.expiresAt) : null;
 
