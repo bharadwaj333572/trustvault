@@ -49,4 +49,10 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Canonical JSON Representation**: Because object key ordering in JavaScript can vary, we built `canonicalJsonStringify()` which sorts keys alphabetically and strips undefined properties, ensuring identical SHA-256 digests across Node.js versions and platforms.
   - **Atomic Failure Handling**: If an audit record fails to insert, `logAuditEvent` throws an unhandled operational exception to ensure the sensitive action (download, upload, grant) is aborted rather than silently succeeding without audit evidence.
 
+### Phase 6: Admin Capabilities & Security Alerts
+- **Uncertainty / Review Areas**:
+  - **Admin Content Isolation Defense**: Re-verified that `/api/documents/[id]/download` invokes `can(adminUser, 'download', doc)`. Since `can()` rejects admin role unless an explicit row exists in `document_grants`, Admin receives a 404 response if attempting direct file exfiltration.
+  - **Security Alerts Thresholds**: Implemented 5 clear, deterministic thresholds for "worth noticing" events: denied spikes ($\ge 3$ in 15 mins), odd hours (00:00-05:00 UTC), bulk downloads ($\ge 5$ in 10 mins), account lockouts, and revoked-user probes.
+  - **CSV Export Escaping**: In the `/api/admin/audit?format=csv` stream, all fields are double-quoted and inner quotes are escaped (`""`) to prevent CSV injection / formula execution vulnerabilities.
+
 ---
