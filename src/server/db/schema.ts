@@ -140,6 +140,16 @@ export const auditLogs = pgTable('audit_logs', {
   requestId: text('request_id'),
 });
 
+// 7. Chain Checkpoints Table (External anchor and tail truncation detection)
+export const chainCheckpoints = pgTable('chain_checkpoints', {
+  id: text('id').primaryKey(),
+  sequenceNumber: integer('sequence_number').notNull(),
+  chainHeadHash: text('chain_head_hash').notNull(),
+  checkpointType: text('checkpoint_type').notNull().default('PERIODIC'), // PERIODIC | ADMIN_VERIFY | EXTERNAL
+  hmacSignature: text('hmac_signature').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Relationships
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),

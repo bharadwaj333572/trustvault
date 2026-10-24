@@ -115,7 +115,20 @@ export async function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_audit_outcome ON audit_logs(outcome);
     CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
 
-    -- 7. PL/pgSQL Function and Triggers for Append-Only Enforcement
+    -- 7. Chain Checkpoints Table (External anchor and tail truncation detection)
+    CREATE TABLE IF NOT EXISTS chain_checkpoints (
+      id TEXT PRIMARY KEY,
+      sequence_number INTEGER NOT NULL,
+      chain_head_hash TEXT NOT NULL,
+      checkpoint_type TEXT NOT NULL DEFAULT 'PERIODIC',
+      hmac_signature TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_checkpoints_seq ON chain_checkpoints(sequence_number);
+    CREATE INDEX IF NOT EXISTS idx_checkpoints_created ON chain_checkpoints(created_at);
+
+    -- 8. PL/pgSQL Function and Triggers for Append-Only Enforcement
     CREATE OR REPLACE FUNCTION prevent_audit_mutation()
     RETURNS TRIGGER AS $$
     BEGIN
