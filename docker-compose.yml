@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trustvault-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: trustvault
+      POSTGRES_PASSWORD: trustvault_secret_password_2026
+      POSTGRES_DB: trustvault
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustvault -d trustvault"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trustvault-app
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://trustvault:trustvault_secret_password_2026@postgres:5432/trustvault
+      STORAGE_DIR: /app/storage
+      SESSION_SECRET: e0a1f2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1
+      COOKIE_SECURE: "false"
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    volumes:
+      - document_storage:/app/storage
+
+volumes:
+  postgres_data:
+  document_storage:

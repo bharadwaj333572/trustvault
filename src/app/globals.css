@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #0B1220;
+  --ink-light: #162032;
+  --paper: #F0EFEA;
+  --paper-dark: #E3E0D8;
+  --accent: #FF5A1F;
+  --denied: #E5484D;
+  --allowed: #30A46C;
+  --hairline: rgba(11, 18, 32, 0.12);
+  --hairline-contrast: rgba(11, 18, 32, 0.24);
+  --bg-current: var(--paper);
+  --text-current: var(--ink);
+}
+
+.dark {
+  --hairline: rgba(255, 255, 255, 0.10);
+  --hairline-contrast: rgba(255, 255, 255, 0.22);
+  --bg-current: var(--ink);
+  --text-current: var(--paper);
+}
+
+body {
+  background-color: var(--bg-current);
+  color: var(--text-current);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Industrial Grid lines */
+.grid-guides {
+  background-size: 100px 100px;
+  background-image: 
+    linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
+}
+
+/* Sharp focus ring for WCAG AA compliance */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Eyebrow styling with orange square */
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.eyebrow::before {
+  content: "■";
+  color: var(--accent);
+  font-size: 10px;
+}
+
+/* Industrial button transitions */
+.btn-industrial {
+  position: relative;
+  transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.btn-industrial:active {
+  transform: translateY(1px);
+}
