@@ -31,4 +31,10 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Account Lockout Timing Leak**: If an attacker attempts to guess emails, responding with 423 Locked reveals the account exists. We ensured that unknown accounts never return 423, but to avoid timing discrepancies, Argon2 dummy verification is evaluated when a user is not found.
   - **Immediate Invalidation on User Disablement**: `validateSession()` queries `users.isDisabled` on every request. If true, it deletes all user sessions from the DB immediately and aborts the request with 401.
 
+### Phase 3: Documents and Storage
+- **Uncertainty / Review Areas**:
+  - **Magic-Byte Sniffing on Zip Containers (DOCX, XLSX, PPTX)**: Office documents share the same PK Zip container header (`PK\x03\x04`). We inspect the initial 2KB payload for specific folder markers (`word/`, `xl/`, `ppt/`) to prevent attackers from smuggling malicious zip archives as documents.
+  - **Streaming File Downloads with Fresh Policy Check**: Instead of issuing signed S3 URLs (which cannot be revoked until expiry), files are proxied through `/api/documents/[id]/download`. Every download query evaluates `validateSession()` and `getDocumentWithAuthorization(..., 'download')` on the exact millisecond before reading disk bytes.
+  - **SQL-Level Authorization Filtering**: We ensured `listAuthorizedDocuments` and `/api/search` execute the grant check directly in the SQL `WHERE` clause (`WHERE owner_id = :uid OR id IN (SELECT document_id FROM document_grants ...)`), preventing memory exhaustion or data leakage from client-side filtering.
+
 ---
