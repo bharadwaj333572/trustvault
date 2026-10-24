@@ -43,4 +43,10 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Owner Self-Grant Prevention**: Checked that an owner cannot grant permissions to themselves, avoiding duplicate or conflicting ACL records.
   - **User Disablement Cascade**: Disabling a user immediately executes `revokeAllUserSessions()`, destroying their active sessions and denying any subsequent API call with 401.
 
+### Phase 5: Tamper-Evident Audit Trail
+- **Uncertainty / Review Areas**:
+  - **Advisory Locks under Concurrent Inserts**: Audit chain hashing requires strict sequencing (`SHA-256(prev_hash + canonical_json)`). We use `pg_advisory_xact_lock(424242)` inside the transaction so concurrent writers line up in single file and never branch the hash chain.
+  - **Canonical JSON Representation**: Because object key ordering in JavaScript can vary, we built `canonicalJsonStringify()` which sorts keys alphabetically and strips undefined properties, ensuring identical SHA-256 digests across Node.js versions and platforms.
+  - **Atomic Failure Handling**: If an audit record fails to insert, `logAuditEvent` throws an unhandled operational exception to ensure the sensitive action (download, upload, grant) is aborted rather than silently succeeding without audit evidence.
+
 ---
