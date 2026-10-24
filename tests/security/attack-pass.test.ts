@@ -384,17 +384,17 @@ describe('Phase 9: Adversarial Attack Pass & Threat Verification', () => {
   describe('7. Upload Validation & Polyglot Defense', () => {
     it('rejects zero-byte empty files', () => {
       const emptyBuffer = Buffer.alloc(0);
-      expect(() => validateUploadedFile(emptyBuffer, 'empty.pdf')).toThrow(/File cannot be empty/);
+      expect(() => validateUploadedFile(emptyBuffer, 'empty.pdf', 0)).toThrow(/File cannot be empty/);
     });
 
     it('rejects executable disguised with valid PDF extension', () => {
       const exeBuffer = Buffer.from('MZ\x90\x00ThisIsAnExecutableFile.exe');
-      expect(() => validateUploadedFile(exeBuffer, 'dangerous.pdf')).toThrow(/Executable PE binaries/);
+      expect(() => validateUploadedFile(exeBuffer, 'dangerous.pdf', exeBuffer.length)).toThrow(/Executable PE binaries/);
     });
 
     it('rejects HTML/SVG payload masquerading as docx', () => {
       const htmlBuffer = Buffer.from('<!DOCTYPE html><html><body><script>alert(document.cookie)</script></body></html>');
-      expect(() => validateUploadedFile(htmlBuffer, 'exploit.docx')).toThrow(/HTML, SVG, and shell scripts cannot be uploaded/);
+      expect(() => validateUploadedFile(htmlBuffer, 'exploit.docx', htmlBuffer.length)).toThrow(/HTML, SVG, and shell scripts cannot be uploaded/);
     });
 
     it('strips directory traversal attempts from filename', () => {
