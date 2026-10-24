@@ -82,7 +82,7 @@ export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
   }
 
   // C. Analyze Denied Spikes (>= 3 denied attempts in 15 min window)
-  for (const [actor, logs] of deniedByActor.entries()) {
+  for (const [actor, logs] of Array.from(deniedByActor.entries())) {
     if (logs.length >= 3) {
       alerts.push({
         id: `alert-denied-spike-${actor}-${logs[0].id}`,
@@ -91,13 +91,13 @@ export async function getSecurityAlerts(): Promise<SecurityAlert[]> {
         title: 'Cluster of Denied Access Attempts',
         description: `${actor} generated ${logs.length} rejected requests in recent activity window.`,
         timestamp: logs[0].createdAt,
-        metadata: { count: logs.length, sampleReasons: logs.map(l => l.reason).slice(0, 3) },
+        metadata: { count: logs.length, sampleReasons: logs.map((l: any) => l.reason).slice(0, 3) },
       });
     }
   }
 
   // D. Analyze Bulk Downloads (>= 5 downloads within window)
-  for (const [actor, logs] of downloadsByActor.entries()) {
+  for (const [actor, logs] of Array.from(downloadsByActor.entries())) {
     if (logs.length >= 5) {
       alerts.push({
         id: `alert-bulk-dl-${actor}-${logs[0].id}`,

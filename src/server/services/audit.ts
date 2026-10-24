@@ -124,13 +124,13 @@ export async function logAuditEvent(params: CreateAuditLogParams): Promise<{ id:
         details: params.details ? JSON.stringify(params.details) : null,
         requestId: params.requestId || null,
       })
-      .returning({
-        id: schema.auditLogs.id,
-        rowHash: schema.auditLogs.rowHash,
-        sequenceNumber: schema.auditLogs.sequenceNumber,
-      });
+      .returning();
 
-    return inserted;
+    return {
+      id: inserted.id,
+      rowHash: inserted.rowHash,
+      sequenceNumber: inserted.sequenceNumber,
+    };
   } catch (err: any) {
     console.error('CRITICAL AUDIT FAILURE: Failed to write to audit log.', err);
     throw new AppError({

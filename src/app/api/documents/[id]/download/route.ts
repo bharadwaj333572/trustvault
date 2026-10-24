@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // Prevent inline XSS rendering (never inline HTML/SVG/executables)
     const sanitizedDownloadName = document.originalFileName.replace(/["\r\n]/g, '_');
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': document.mimeType || 'application/octet-stream',

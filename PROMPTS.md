@@ -61,4 +61,11 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Confirm-Only UX Boundary**: The suggestions endpoint strictly returns candidate recommendation objects to pre-fill client form fields. Under no circumstance does the suggestion route insert into `document_grants`. This was explicitly proved in `tests/security/ai-suggestions.test.ts`.
   - **Auditing Advisory Interactions**: Added dedicated audit actions `SUGGESTION_SHOWN`, `SUGGESTION_ACCEPTED`, and `SUGGESTION_REJECTED` so auditors can track algorithmic suggestions and human confirmations.
 
+### Phase 8: Landing Page & App UI
+- **Uncertainty / Review Areas**:
+  - **Industrial Identity Consistency**: Ensured exact design token adherence (`--ink: #0B1220`, `--paper: #F0EFEA`, `--accent: #FF5A1F`, `--denied: #E5484D`, `--allowed: #30A46C`). All eyebrows use the small orange square bullet (`■`).
+  - **Card 03 Highlight in Solid Orange**: In the landing page "Three promises", card 03 ("Revoking works immediately") is prominently rendered with a solid orange background and white high-contrast typography as requested.
+  - **Live Access Simulation Fidelity**: Ensured the "Try to break it" widget and Live Access Log card show realistic SHA-256 blocks, true policy decision rationale, and explicit simulation labels.
+  - **Uniform 404 UI**: Document detail routes and the custom Next.js 404 page emit identical layouts for both missing and forbidden documents.
+
 ---

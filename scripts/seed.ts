@@ -275,7 +275,7 @@ export async function seedDatabase() {
       actorId: event.actorId,
       actorEmail: event.actorEmail,
       action: event.action,
-      outcome: event.outcome,
+      outcome: event.outcome as 'ALLOWED' | 'DENIED',
       documentId: event.documentId,
       reason: event.reason,
     });
