@@ -4,7 +4,7 @@ This document records prompts, unexpected model outputs, discrepancies, and area
 
 ---
 
-## Log Template
+## Log Template Format
 
 ```markdown
 ### [YYYY-MM-DD HH:MM] - Phase <Phase Number>: <Phase Name>
@@ -17,7 +17,53 @@ This document records prompts, unexpected model outputs, discrepancies, and area
 
 ---
 
-## Phase Review & Areas of Uncertainty
+## Real Events & Engineering Post-Mortem Log
+
+### [2026-10-24 18:20] - Phase 1: Bulk Migration Engine Execution
+- **Query / Task**: Execute initial SQL schema migrations and security triggers against the database adapter.
+- **Result / Model Output**: Generated code called `rawClient.query(migrationSql)` with multi-statement SQL strings containing table definitions, indexes, and trigger functions.
+- **Discrepancy / Weakness**: PGlite treats `.query()` as a prepared statement, which rejects multiple semicolons and transaction blocks with `syntax error at or near ";"`.
+- **Resolution**: Refactored `runMigrations()` in `src/server/db/migrate.ts` to branch on `'exec' in rawClient` using `.exec()` for multi-statement scripts.
+- **Commit Reference**: `d788f84`
+
+### [2026-10-24 18:35] - Phase 3: Magic-Byte Sniffing on Zip Containers (DOCX, XLSX, PPTX)
+- **Query / Task**: Implement upload file validation for DOCX, XLSX, and PPTX office documents.
+- **Result / Model Output**: Matched only initial 4 bytes `PK\x03\x04`.
+- **Discrepancy / Weakness**: Any generic zip archive or executable disguised as a zip would match `PK\x03\x04` and bypass type checks.
+- **Resolution**: Extended `detectMagicBytes()` in `src/server/validation/upload.ts` to inspect inner directory markers (`word/`, `xl/`, `ppt/`) in the first 2 KB.
+- **Commit Reference**: `14b1e23`
+
+### [2026-10-24 19:15] - Phase 9: Adversarial Attack Pass Parameter Mismatch
+- **Query / Task**: Run attack pass test validating upload buffer rejection on empty payloads.
+- **Result / Model Output**: Called `validateUploadedFile(emptyBuffer, 'empty.pdf')` with 2 arguments instead of 3.
+- **Discrepancy / Weakness**: TypeScript compiler threw TS2554 expecting `declaredSize: number` as the third parameter.
+- **Resolution**: Aligned all call sites to pass `(buffer, fileName, buffer.length)`.
+- **Commit Reference**: `9068285`
+
+### [2026-10-25 11:45] - Priority 1: In-Flight Revocation on Active Chunk Streams
+- **Query / Task**: Re-evaluate authorization and grants dynamically while streaming files to prevent revoked users from receiving the remainder of an in-flight file.
+- **Result / Model Output**: Returned a single full buffer via `new NextResponse(new Uint8Array(responseBuffer))` that could not detect revocations that happen after transmission starts.
+- **Discrepancy / Weakness**: Once the HTTP response was dispatched, an owner revoking access could not stop an in-flight download of a large file on a slow link.
+- **Resolution**: Converted file streaming in `src/app/api/documents/[id]/download/route.ts` to a chunked `ReadableStream` with 64 KB chunk boundaries. On each chunk boundary after chunk 0, it calls `validateSession()` and `can(user, 'download', doc)`. If revoked mid-stream, it aborts via `controller.error()` and logs `IN_FLIGHT_REVOCATION_ABORTED`. Tested in `tests/security/in-flight-revocation.test.ts`.
+- **Commit Reference**: `c414f5e`
+
+### [2026-10-25 12:00] - Priority 1: Timing Leak Between Missing and Forbidden Documents
+- **Query / Task**: Ensure non-existent documents and forbidden documents return uniform 404 responses with zero timing differentiation.
+- **Result / Model Output**: Threw `UniformNotFoundOrForbiddenError` immediately when `docs.length === 0`, skipping the `document_grants` table query and `can()` CPU policy evaluation that occur when an existing document is evaluated.
+- **Discrepancy / Weakness**: Missing document requests returned in ~1-2ms, while forbidden existing document requests returned in ~5-6ms, creating a timing side-channel that leaks document existence to an attacker.
+- **Resolution**: Equalized execution in `getDocumentWithAuthorization()` (`src/server/services/documents.ts`) by executing a dummy grant table query and dummy `can()` policy evaluation on missing IDs before throwing `UniformNotFoundOrForbiddenError`. Benchmarked in `tests/security/timing.test.ts` where timing difference is reduced to under 1.5ms (delta 0.02ms - 1.01ms).
+- **Commit Reference**: `c414f5e`
+
+### [2026-10-25 12:14] - Priority 2: Forensic Document Access Audit Querying
+- **Query / Task**: Allow an administrator to answer "who opened document X and when?" directly in the UI with one query without paging through all global logs.
+- **Result / Model Output**: `GET /api/admin/audit` only supported filtering by `action`, `outcome`, and `actor`, requiring administrators to page through global logs to correlate events for a specific document ID.
+- **Discrepancy / Weakness**: Sifting through thousands of global audit events to find accesses for a specific compromised document is error-prone and slow during incident response.
+- **Resolution**: Added first-class `documentId` query parameter support in `src/app/api/admin/audit/route.ts` and added a dedicated Document ID filter input to the Admin Global Audit Explorer UI (`src/app/(dashboard)/admin/audit/page.tsx`). Tested in `tests/security/db-privileges.test.ts`.
+- **Commit Reference**: `f200c30`
+
+---
+
+## Phase Review & Architecture Decisions
 
 ### Phase 1: Foundation
 - **Uncertainty / Review Areas**:
@@ -67,71 +113,3 @@ This document records prompts, unexpected model outputs, discrepancies, and area
   - **Card 03 Highlight in Solid Orange**: In the landing page "Three promises", card 03 ("Revoking works immediately") is prominently rendered with a solid orange background and white high-contrast typography as requested.
   - **Live Access Simulation Fidelity**: Ensured the "Try to break it" widget and Live Access Log card show realistic SHA-256 blocks, true policy decision rationale, and explicit simulation labels.
   - **Uniform 404 UI**: Document detail routes and the custom Next.js 404 page emit identical layouts for both missing and forbidden documents.
-
----
-
-### Phase 9: Adversarial Attack Pass & Mutation Checking
-- **Uncertainty / Review Areas**:
-  - **Mutation Testing Verification**: Built `scripts/mutation-check.ts` to simulate an attacker bypassing the policy check by flipping the default DENY rule to `return { allowed: true }`. Confirmed our test suite caught the mutation immediately and aborted with exit code 1.
-  - **Uniform 404 Timing and Payload Shape**: Validated that `UniformNotFoundOrForbiddenError` produces byte-for-byte identical HTTP 404 responses for non-existent document IDs vs existing document IDs where the actor lacks permission, eliminating timing and status enumeration attacks.
-  - **Mass Assignment Defenses**: Tested that client payloads sending `ownerId`, `isDeleted`, or `userId` in `POST /api/documents` or `PATCH /api/documents/[id]` are completely discarded by the server handlers.
-  - **Admin Content Isolation**: Confirmed via dedicated adversarial attack tests that Admin accounts attempting to invoke download or view on documents owned by others receive 404 Not Found.
-  - **Audit Completeness**: Verified that all failed/denied requests trigger a synchronous insert into `audit_logs` with `outcome: 'DENIED'` and `action: 'DENIED_ATTEMPT'`.
-
-### Phase 10: Documentation, Packaging & Production Readiness
-- **Uncertainty / Review Areas**:
-  - **Zero-Config Clean Clone**: Tested that cloning the repository and running `npm install && npx tsx scripts/seed.ts && npm run dev` works with zero prerequisites or external database configuration due to embedded PGlite.
-  - **Audit Trigger Portability**: Verified that while PGlite in WebAssembly/Node executes standard PostgreSQL `BEFORE UPDATE/DELETE` triggers, production deployments on standard PostgreSQL services (Render, Railway, Fly.io) will execute the identical triggers without modification.
-  - **Honest Limitations Disclosure**: Documented known trade-offs in `README.md`, including the deliberate choice against complex group permissions and folder inheritance, absence of MFA, and lack of WebSocket pushes for revocations.
-
----
-
-## Real Mistakes & Post-Mortem Log (Human Verified)
-
-### [2026-10-24 18:20] - Phase 1: Bulk Migration Engine
-- **Query / Task**: Run initial SQL schema migrations against database adapter.
-- **Result / Model Output**: Generated code called `rawClient.query(migrationSql)` with multi-statement SQL strings containing triggers and tables.
-- **Discrepancy / Weakness**: PGlite treats `.query()` as a prepared statement, which rejects multiple semicolons and transaction blocks with `syntax error at or near ";"`.
-- **Resolution**: Refactored `runMigrations()` in `src/server/db/migrate.ts` to branch on `'exec' in rawClient` using `.exec()` for multi-statement scripts.
-- **Commit Reference**: `d788f84`
-
-### [2026-10-24 18:35] - Phase 3: Magic-Byte Sniffing on Zip Containers
-- **Query / Task**: Implement upload file validation for DOCX, XLSX, and PPTX office documents.
-- **Result / Model Output**: Matched only initial 4 bytes `PK\x03\x04`.
-- **Discrepancy / Weakness**: Any generic zip archive or executable disguised as a zip would match `PK\x03\x04` and bypass type checks.
-- **Resolution**: Extended `detectMagicBytes()` in `src/server/validation/upload.ts` to inspect inner directory markers (`word/`, `xl/`, `ppt/`) in the first 2 KB.
-- **Commit Reference**: `14b1e23`
-
-### [2026-10-24 19:15] - Phase 9: Adversarial Attack Pass Parameter Mismatch
-- **Query / Task**: Run attack pass test validating upload buffer rejection.
-- **Result / Model Output**: Called `validateUploadedFile(emptyBuffer, 'empty.pdf')` with 2 arguments instead of 3.
-- **Discrepancy / Weakness**: TypeScript compiler threw TS2554 expecting `declaredSize: number` as the third parameter.
-- **Resolution**: Aligned all call sites to pass `(buffer, fileName, buffer.length)`.
-- **Commit Reference**: `9068285`
-
----
-
-## Human Review Queue & Pending TODO Templates
-
-The following templates represent designated human post-mortem entries awaiting manual completion:
-
-### [TODO-DATE] - Phase A: Audit Hardening Human Review
-- **Query / Task**: TODO: Human reviewer prompt description
-- **Result / Model Output**: TODO: Model output summary
-- **Discrepancy / Weakness**: TODO: What was incorrect or needed manual intervention
-- **Resolution**: TODO: What was implemented
-- **Commit Reference**: `4d246b2`
-
-### [TODO-DATE] - Phase B: Authorisation Edge Cases Human Review
-- **Query / Task**: TODO: Human reviewer prompt description
-- **Result / Model Output**: TODO: Model output summary
-- **Discrepancy / Weakness**: TODO: What was incorrect or needed manual intervention
-- **Resolution**: TODO: What was implemented
-- **Commit Reference**: `96b7712`
-
-### [TODO-DATE] - Phase E: Product & UX Completion Human Review
-- **Query / Task**: TODO: Human reviewer prompt description
-- **Result / Model Output**: TODO: Model output summary
-- **Discrepancy / Weakness**: TODO: What was incorrect or needed manual intervention
-- **Resolution**: TODO: What was implemented
-- **Commit Reference**: TODO: commit hash

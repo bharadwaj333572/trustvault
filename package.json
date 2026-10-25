@@ -14,7 +14,8 @@
     "db:migrate": "tsx src/server/db/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "audit:verify": "tsx scripts/verify-audit-chain.ts",
-    "mutation:check": "tsx scripts/mutation-check.ts"
+    "mutation:check": "tsx scripts/mutation-check.ts",
+    "check:prompts": "tsx scripts/check-prompts.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.14",

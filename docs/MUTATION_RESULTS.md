@@ -1,6 +1,6 @@
 # TrustVault Security Mutation Testing Results
 
-> **Generated**: 2026-10-24T14:36:58.316Z  
+> **Generated**: 2026-10-25T06:47:41.273Z  
 > **Policy Target**: `src/server/policy/index.ts`  
 > **Mutation Coverage**: 100% of policy branches  
 > **Detection Rate**: 100% KILLED / 0% SURVIVED  

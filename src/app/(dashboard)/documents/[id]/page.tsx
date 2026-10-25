@@ -92,10 +92,30 @@ export default function DocumentDetailPage({ params }: { params: { id: string } 
   const [shareOpen, setShareOpen] = useState(false);
   const [targetEmail, setTargetEmail] = useState('');
   const [permissionLevel, setPermissionLevel] = useState<'READ' | 'EDIT'>('READ');
-  const [expiryDays, setExpiryDays] = useState('30');
+  const [expiryDays, setExpiryDays] = useState('7');
+  const [customExpiry, setCustomExpiry] = useState('');
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+
+  function formatGrantExpiry(expiresAt: string | null): string {
+    if (!expiresAt) return 'NEVER';
+    const now = Date.now();
+    const exp = new Date(expiresAt).getTime();
+    const diffMs = exp - now;
+
+    if (diffMs <= 0) {
+      const hoursAgo = Math.max(1, Math.round(Math.abs(diffMs) / (1000 * 60 * 60)));
+      return `EXPIRED ${hoursAgo}h ago`;
+    }
+
+    const hours = Math.round(diffMs / (1000 * 60 * 60));
+    if (hours < 24) {
+      return `expires in ${hours}h`;
+    }
+    const days = Math.round(hours / 24);
+    return `expires in ${days}d (${hours}h)`;
+  }
 
   // Version Upload State
   const [versionModalOpen, setVersionModalOpen] = useState(false);
@@ -197,7 +217,9 @@ export default function DocumentDetailPage({ params }: { params: { id: string } 
 
     try {
       let expiresAt: string | null = null;
-      if (expiryDays !== 'never') {
+      if (expiryDays === 'custom' && customExpiry) {
+        expiresAt = new Date(customExpiry).toISOString();
+      } else if (expiryDays !== 'never') {
         const days = parseInt(expiryDays, 10);
         expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
       }
@@ -517,8 +539,8 @@ export default function DocumentDetailPage({ params }: { params: { id: string } 
                           {g.permission}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-paper-dark">
-                        {g.expiresAt ? new Date(g.expiresAt).toLocaleDateString() : 'NEVER'}
+                      <td className="py-3 px-4 text-paper-dark font-mono text-[11px]">
+                        {formatGrantExpiry(g.expiresAt)}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <button
@@ -680,19 +702,35 @@ export default function DocumentDetailPage({ params }: { params: { id: string } 
 
               <div>
                 <label className="block text-[10px] uppercase tracking-widest text-paper-dark/60 mb-1">
-                  Expiration Window
+                  Expiration Window (Strict Grant TTL)
                 </label>
                 <select
                   value={expiryDays}
                   onChange={(e) => setExpiryDays(e.target.value)}
-                  className="w-full bg-ink-light border border-border-dark focus:border-accent p-2 rounded text-paper outline-none"
+                  className="w-full bg-ink-light border border-border-dark focus:border-accent p-2 rounded text-paper outline-none font-mono text-xs"
                 >
+                  <option value="1">1 Day (24 Hours)</option>
                   <option value="7">7 Days</option>
                   <option value="30">30 Days</option>
-                  <option value="90">90 Days</option>
-                  <option value="never">No Expiration (Indefinite)</option>
+                  <option value="custom">Custom Date & Time</option>
+                  <option value="never">No Expiration (Never)</option>
                 </select>
               </div>
+
+              {expiryDays === 'custom' && (
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-accent mb-1">
+                    Custom Expiration Timestamp
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={customExpiry}
+                    onChange={(e) => setCustomExpiry(e.target.value)}
+                    className="w-full bg-ink-light border border-border-dark focus:border-accent p-2 rounded text-paper outline-none font-mono text-xs"
+                  />
+                </div>
+              )}
 
               <div className="p-3 bg-ink-light border border-border-dark rounded text-[10px] text-paper-dark/60">
                 Revoking this grant in the future takes effect immediately on their next download or view request.
