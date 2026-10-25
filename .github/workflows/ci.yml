@@ -52,4 +52,4 @@ jobs:
           DATABASE_URL: postgresql://trustvault:trustvault_test_password@localhost:5432/trustvault_test
           STORAGE_DIR: ./storage
           SESSION_SECRET: test_session_secret_at_least_32_characters_long_for_ci
-        run: npm test
+        run: npm test -- --no-file-parallelism
