@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     const action = searchParams.get('action') || undefined;
     const outcome = searchParams.get('outcome') || undefined;
     const actorEmail = searchParams.get('actor') || undefined;
+    const documentId = searchParams.get('documentId') || undefined;
     const limit = Math.min(searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 50, 500);
     const page = Math.max(searchParams.get('page') ? parseInt(searchParams.get('page')!, 10) : 1, 1);
     const offset = (page - 1) * limit;
@@ -40,6 +41,9 @@ export async function GET(req: NextRequest) {
     }
     if (actorEmail) {
       conditions.push(ilike(schema.auditLogs.actorEmail, `%${actorEmail.trim()}%`));
+    }
+    if (documentId) {
+      conditions.push(eq(schema.auditLogs.documentId, documentId.trim()));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

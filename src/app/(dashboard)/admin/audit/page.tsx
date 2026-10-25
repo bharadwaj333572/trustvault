@@ -24,6 +24,7 @@ export default function AdminAuditPage() {
   const [actionFilter, setActionFilter] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState('');
   const [actorFilter, setActorFilter] = useState('');
+  const [documentFilter, setDocumentFilter] = useState('');
 
   async function loadAudit() {
     setLoading(true);
@@ -32,6 +33,7 @@ export default function AdminAuditPage() {
       if (actionFilter) params.set('action', actionFilter);
       if (outcomeFilter) params.set('outcome', outcomeFilter);
       if (actorFilter) params.set('actor', actorFilter);
+      if (documentFilter) params.set('documentId', documentFilter);
       params.set('limit', '100');
 
       const res = await fetch(`/api/admin/audit?${params.toString()}`);
@@ -45,6 +47,14 @@ export default function AdminAuditPage() {
   }
 
   useEffect(() => {
+    // Check if documentId is present in URL query
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const docParam = urlParams.get('documentId');
+      if (docParam) {
+        setDocumentFilter(docParam);
+      }
+    }
     loadAudit();
   }, [actionFilter, outcomeFilter]);
 
@@ -74,13 +84,23 @@ export default function AdminAuditPage() {
 
       {/* Filter Toolbar */}
       <div className="p-4 bg-ink-light border border-border-dark rounded-md flex flex-wrap items-center gap-4">
-        <form onSubmit={handleFilterSubmit} className="flex-1 min-w-[200px]">
+        <form onSubmit={handleFilterSubmit} className="flex-1 min-w-[180px]">
           <input
             type="text"
             value={actorFilter}
             onChange={(e) => setActorFilter(e.target.value)}
             placeholder="Filter by actor email..."
             className="w-full bg-ink border border-border-dark focus:border-accent px-3 py-1.5 rounded text-xs text-paper outline-none"
+          />
+        </form>
+
+        <form onSubmit={handleFilterSubmit} className="flex-1 min-w-[220px]">
+          <input
+            type="text"
+            value={documentFilter}
+            onChange={(e) => setDocumentFilter(e.target.value)}
+            placeholder="Document ID (Who opened doc X?)..."
+            className="w-full bg-ink border border-border-dark focus:border-accent px-3 py-1.5 rounded text-xs text-paper outline-none font-mono"
           />
         </form>
 
@@ -100,14 +120,23 @@ export default function AdminAuditPage() {
           className="bg-ink border border-border-dark px-3 py-1.5 rounded text-xs text-paper outline-none"
         >
           <option value="">ALL ACTIONS</option>
-          <option value="LOGIN_SUCCESS">LOGIN_SUCCESS</option>
-          <option value="LOGIN_FAILURE">LOGIN_FAILURE</option>
-          <option value="DOWNLOAD">DOWNLOAD</option>
-          <option value="UPLOAD">UPLOAD</option>
-          <option value="GRANT">GRANT</option>
-          <option value="REVOKE">REVOKE</option>
-          <option value="DENIED_ATTEMPT">DENIED_ATTEMPT</option>
+          <option value="DOWNLOAD">DOWNLOADS ONLY</option>
+          <option value="VIEW">VIEWS ONLY</option>
+          <option value="UPLOAD">UPLOADS</option>
+          <option value="GRANT">GRANTS</option>
+          <option value="REVOKE">REVOCATIONS</option>
+          <option value="LOGIN_SUCCESS">LOGINS</option>
+          <option value="DENIED_ATTEMPT">SECURITY INTRUSIONS</option>
         </select>
+
+        <button
+          type="button"
+          onClick={loadAudit}
+          className="bg-ink hover:bg-ink-dark border border-border-dark px-3 py-1.5 rounded text-paper font-bold flex items-center gap-1.5"
+        >
+          <Search className="w-3.5 h-3.5 text-accent" />
+          <span>QUERY</span>
+        </button>
 
         <button
           onClick={loadAudit}
