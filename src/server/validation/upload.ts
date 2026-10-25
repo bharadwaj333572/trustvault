@@ -169,6 +169,34 @@ export function detectMagicBytes(buffer: Buffer): AllowedMimeType {
 }
 
 /**
+ * Extension to MIME mapping for polyglot and extension mismatch verification
+ */
+const EXTENSION_MIME_MAP: Record<string, AllowedMimeType[]> = {
+  '.pdf': ['application/pdf'],
+  '.png': ['image/png'],
+  '.jpg': ['image/jpeg'],
+  '.jpeg': ['image/jpeg'],
+  '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  '.xlsx': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  '.pptx': ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  '.txt': ['text/plain'],
+  '.csv': ['text/csv'],
+};
+
+const DISALLOWED_EXTENSIONS = new Set([
+  '.exe', '.dll', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.mjs', '.jar', '.php', '.py', '.elf', '.com', '.scr', '.hta'
+]);
+
+/**
+ * Malware scan placeholder.
+ * Production hooks connect to ClamAV, AWS GuardDuty, or VirusTotal API.
+ */
+export async function scanFileForMalware(buffer: Buffer): Promise<{ isClean: boolean; threatName?: string }> {
+  // Production integration hook: scans buffer against antivirus definitions.
+  return { isClean: true };
+}
+
+/**
  * Full file validation pipeline.
  */
 export function validateUploadedFile(
@@ -184,8 +212,23 @@ export function validateUploadedFile(
     throw new ValidationError('File cannot be empty (0 bytes).');
   }
 
-  const detectedMime = detectMagicBytes(buffer);
   const sanitizedFileName = sanitizeFileName(declaredFileName);
+  const ext = path.extname(sanitizedFileName).toLowerCase();
+
+  // Reject dangerous executable extensions explicitly
+  if (DISALLOWED_EXTENSIONS.has(ext)) {
+    throw new ValidationError(`Security violation: Files with extension "${ext}" are strictly prohibited.`);
+  }
+
+  const detectedMime = detectMagicBytes(buffer);
+
+  // Reject polyglot and file extension / magic-byte mismatches
+  const allowedMimes = EXTENSION_MIME_MAP[ext];
+  if (allowedMimes && !allowedMimes.includes(detectedMime)) {
+    throw new ValidationError(
+      `File extension mismatch: Declared extension "${ext}" does not match true binary content (${detectedMime}). Polyglot uploads are rejected.`
+    );
+  }
 
   return {
     detectedMime,

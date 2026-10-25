@@ -10,6 +10,37 @@ interface IpRateRecord {
 const MAX_IP_ATTEMPTS = 15;
 const IP_WINDOW_MS = 60 * 1000; // 1 minute
 const ipStore = new Map<string, IpRateRecord>();
+const actionStore = new Map<string, IpRateRecord>();
+
+/** Test-only: clear in-memory rate limit buckets. */
+export function resetIpRateLimitStoreForTests(): void {
+  ipStore.clear();
+  actionStore.clear();
+}
+
+/**
+ * Checks generalized action rate limiting (upload, search, autocomplete, share).
+ */
+export function checkActionRateLimit(
+  key: string,
+  maxAttempts: number = 30,
+  windowMs: number = 60 * 1000
+): void {
+  const now = Date.now();
+  const record = actionStore.get(key);
+
+  if (!record || now > record.resetAt) {
+    actionStore.set(key, { attempts: 1, resetAt: now + windowMs });
+    return;
+  }
+
+  if (record.attempts >= maxAttempts) {
+    const secondsRemaining = Math.ceil((record.resetAt - now) / 1000);
+    throw new RateLimitedError(secondsRemaining);
+  }
+
+  record.attempts += 1;
+}
 
 const MAX_ACCOUNT_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MINUTES = 15;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSession, SESSION_COOKIE_NAME } from '@/server/auth/session';
 import { createDocument, listAuthorizedDocuments } from '@/server/services/documents';
+import { checkActionRateLimit } from '@/server/auth/rate-limit';
 import { AppError } from '@/server/errors';
 
 export async function GET(req: NextRequest) {
@@ -14,6 +15,8 @@ export async function GET(req: NextRequest) {
     }
 
     const { user } = await validateSession(token);
+    checkActionRateLimit('search:' + user.id, 60, 60000);
+
     const { searchParams } = new URL(req.url);
 
     const search = searchParams.get('search') || undefined;
@@ -53,8 +56,17 @@ export async function POST(req: NextRequest) {
     }
 
     const { user } = await validateSession(token);
+    checkActionRateLimit('upload:' + user.id, 20, 60000);
 
-    const formData = await req.formData();
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Expected multipart/form-data upload.' } },
+        { status: 400 }
+      );
+    }
     const file = formData.get('file') as File | null;
     const title = (formData.get('title') as string) || '';
     const category = (formData.get('category') as any) || 'OTHER';

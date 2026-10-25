@@ -8,6 +8,15 @@ export function middleware(request: NextRequest) {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     const origin = request.headers.get('origin');
     const host = request.headers.get('host');
+    const hasAuthCookie = request.cookies.has('trustvault_session');
+
+    // Reject cookie-authenticated mutating requests if Origin header is missing
+    if (hasAuthCookie && !origin) {
+      return NextResponse.json(
+        { error: { code: 'UNAUTHORIZED', message: 'CSRF protection: Origin header is required for cookie-authenticated mutating requests.' } },
+        { status: 403 }
+      );
+    }
 
     if (origin && host) {
       try {

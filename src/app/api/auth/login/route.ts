@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db, schema } from '@/server/db';
 import { eq } from 'drizzle-orm';
 import { verifyPassword } from '@/server/auth/password';
-import { createSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/server/auth/session';
+import { createSession, revokeSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/server/auth/session';
 import { checkIpRateLimit, checkAccountLockout, recordFailedLogin, resetFailedLogin } from '@/server/auth/rate-limit';
 import { logAuditEvent } from '@/server/services/audit';
 import { AppError } from '@/server/errors';
@@ -115,7 +115,13 @@ export async function POST(req: NextRequest) {
     // 5. Successful login: reset failed login counter
     await resetFailedLogin(user.id);
 
-    // 6. Create DB session
+    // Session Rotation on Login: Revoke existing session token if client presented one
+    const existingCookieToken = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    if (existingCookieToken) {
+      await revokeSession(existingCookieToken).catch(() => {});
+    }
+
+    // 6. Create fresh DB session
     const { rawToken, expiresAt } = await createSession(user.id, ip, userAgent);
 
     // 7. Record login success in audit hash chain

@@ -163,6 +163,21 @@ export async function getDocumentWithAuthorization(
     .limit(1);
 
   if (docs.length === 0) {
+    // Timing Attack Countermeasure: Equalize execution profile against forbidden documents.
+    // Perform an identical grants table query and central policy computation so response
+    // times between 'missing' and 'forbidden' remain indistinguishable within statistical tolerance.
+    await db
+      .select()
+      .from(schema.documentGrants)
+      .where(eq(schema.documentGrants.documentId, documentId));
+
+    can(
+      user,
+      action,
+      { id: documentId, title: 'redacted', ownerId: '00000000-0000-0000-0000-000000000000', isDeleted: false },
+      []
+    );
+
     // Audit denied attempt for missing document
     await logAuditEvent({
       actorId: user.id,
@@ -338,6 +353,8 @@ export async function softDeleteDocument(
 
 /**
  * Restores a soft-deleted document (Owner only).
+ * Authorization MUST go through can() via getDocumentWithAuthorization —
+ * never a bespoke ownerId check that bypasses uniform 404 / DENIED audit.
  */
 export async function restoreDocument(
   user: AuthenticatedUser,
@@ -346,14 +363,19 @@ export async function restoreDocument(
   userAgent?: string,
   requestId?: string
 ) {
-  const docs = await db
-    .select()
-    .from(schema.documents)
-    .where(eq(schema.documents.id, documentId))
-    .limit(1);
+  // Soft-deleted docs: can() allows owner 'edit' (OWNER_TRASH_MANAGEMENT).
+  // Non-owners and missing IDs both yield UniformNotFoundOrForbiddenError + DENIED_ATTEMPT.
+  const { document } = await getDocumentWithAuthorization(
+    user,
+    documentId,
+    'edit',
+    clientIp,
+    userAgent,
+    requestId
+  );
 
-  if (docs.length === 0 || docs[0].ownerId !== user.id) {
-    throw new UniformNotFoundOrForbiddenError('DOCUMENT_NOT_FOUND_OR_NOT_OWNER');
+  if (!document.isDeleted) {
+    throw new ValidationError('Document is not in trash.');
   }
 
   const now = new Date();

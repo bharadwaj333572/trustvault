@@ -60,7 +60,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const { user } = await validateSession(token);
 
-    const formData = await req.formData();
+    // Authorize BEFORE body validation so missing-file cannot distinguish existence (uniform 404).
+    await getDocumentWithAuthorization(user, params.id, 'edit', ip, userAgent);
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return NextResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: 'Expected multipart/form-data upload.' } },
+        { status: 400 }
+      );
+    }
     const file = formData.get('file') as File | null;
 
     if (!file) {

@@ -56,3 +56,14 @@ In TrustVault, authorization is strictly closed. If an explicit policy rule or a
 - **Zero Sharing Rights**: Cannot grant, delegate, or revoke access for any document.
 - **Zero Deletion Rights**: Cannot delete, archive, or restore documents.
 - **Zero Discovery Rights**: Cannot list, search, or probe documents they have not been granted. Any attempt to access an ungranted document returns an identical `404 Not Found` response.
+
+---
+
+### 4. Owner Transfer: Explicitly Unsupported by Design
+
+Ownership of a document in TrustVault is **strictly immutable from creation**. The API and UI do not support document owner transfers.
+
+#### Rationale:
+1. **Auditable Custody Lineage**: Immutable ownership ensures the origin, creator, and chain of custody of a sensitive document can never be falsified or disputed in legal/forensic audits.
+2. **Privilege Handover Exploit Defense**: Prevents an adversary with temporary compromised credentials from transferring all confidential corporate documents to an external rogue account and locking out the true owner.
+3. **Migration Alternative**: If ownership transition is required, the recipient user must re-upload the file under their own credentials, generating a distinct audit trail and storage key.

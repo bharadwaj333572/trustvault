@@ -141,6 +141,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span>SHARED WITH ME</span>
           </Link>
 
+          <Link
+            href="/sessions"
+            className={`flex items-center gap-2.5 px-3 py-2 rounded transition-colors ${
+              pathname === '/sessions'
+                ? 'bg-accent text-white font-bold'
+                : 'text-paper-dark hover:bg-ink-light hover:text-paper'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>ACTIVE SESSIONS</span>
+          </Link>
+
           {role === 'OWNER' && (
             <Link
               href="/documents?trash=true"

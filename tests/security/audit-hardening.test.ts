@@ -230,9 +230,21 @@ describe('PHASE A: Audit Hardening & Cryptographic Integrity', () => {
         methods: ['POST'],
         auditedActions: ['auth.logout', 'LOGOUT'],
       },
+      'api/auth/sessions': {
+        methods: ['DELETE'],
+        auditedActions: ['SESSIONS_REVOKED_OTHERS'],
+      },
+      'api/auth/password': {
+        methods: ['POST'],
+        auditedActions: ['PASSWORD_CHANGE', 'PASSWORD_CHANGE_FAILURE', 'auth.password_changed'],
+      },
       'api/documents': {
         methods: ['POST'],
         auditedActions: ['document.upload', 'UPLOAD'],
+      },
+      'api/documents/bulk': {
+        methods: ['POST'],
+        auditedActions: ['EDIT', 'DELETE', 'softDeleteDocument'],
       },
       'api/documents/[id]': {
         methods: ['PATCH', 'DELETE'],
@@ -257,6 +269,14 @@ describe('PHASE A: Audit Hardening & Cryptographic Integrity', () => {
       'api/documents/[id]/versions': {
         methods: ['POST'],
         auditedActions: ['document.version_created', 'NEW_VERSION', 'DENIED_ATTEMPT'],
+      },
+      'api/documents/[id]/versions/[versionId]/restore': {
+        methods: ['POST'],
+        auditedActions: ['VERSION_RESTORED', 'DENIED_ATTEMPT'],
+      },
+      'api/admin/users': {
+        methods: ['POST'],
+        auditedActions: ['user.created', 'USER_CREATE'],
       },
       'api/admin/users/[id]': {
         methods: ['PATCH'],

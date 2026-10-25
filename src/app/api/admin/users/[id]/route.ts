@@ -43,6 +43,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.role && ['ADMIN', 'OWNER', 'VIEWER'].includes(body.role)) {
       if (body.role !== targetUser.role) {
         updatePayload.role = body.role;
+
+        // Immediate Invalidation: Purge all active sessions when user role changes to prevent privilege confusion
+        await revokeAllUserSessions(targetUser.id);
+
         await logAuditEvent({
           actorId: adminUser.id,
           actorEmail: adminUser.email,
@@ -57,6 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             targetEmail: targetUser.email,
             previousRole: targetUser.role,
             newRole: body.role,
+            sessionsRevoked: true,
           },
         });
       }

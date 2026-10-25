@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSession, SESSION_COOKIE_NAME } from '@/server/auth/session';
+import { checkActionRateLimit } from '@/server/auth/rate-limit';
 import { db, schema } from '@/server/db';
 import { ilike, and, eq, or } from 'drizzle-orm';
 import { AppError } from '@/server/errors';
-
-// In-memory sliding window rate limiter for autocomplete: max 30 requests per minute per user
-const autocompleteRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,19 +21,7 @@ export async function GET(req: NextRequest) {
     const { user } = await validateSession(token);
 
     // Rate Limiting Defense: 30 requests / minute
-    const now = Date.now();
-    const rateLimit = autocompleteRateLimitMap.get(user.id);
-    if (rateLimit && rateLimit.resetAt > now) {
-      if (rateLimit.count >= 30) {
-        return NextResponse.json(
-          { error: { code: 'RATE_LIMIT_EXCEEDED', message: 'Too many autocomplete requests. Please wait a moment.' } },
-          { status: 429 }
-        );
-      }
-      rateLimit.count += 1;
-    } else {
-      autocompleteRateLimitMap.set(user.id, { count: 1, resetAt: now + 60000 });
-    }
+    checkActionRateLimit('autocomplete:' + user.id, 30, 60000);
 
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get('q') || '').trim();

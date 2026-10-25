@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSession, SESSION_COOKIE_NAME } from '@/server/auth/session';
 import { listDocumentGrants, createDocumentGrant } from '@/server/services/grants';
+import { checkActionRateLimit } from '@/server/auth/rate-limit';
 import { AppError } from '@/server/errors';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     const { user } = await validateSession(token);
+    checkActionRateLimit('share:' + user.id, 30, 60000);
     const body = await req.json();
 
     if (!body.targetEmail || !body.permission) {

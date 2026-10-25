@@ -5,7 +5,9 @@ import { UnauthenticatedError } from '../errors';
 import { cookies } from 'next/headers';
 
 export const SESSION_COOKIE_NAME = 'trustvault_session';
-export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days (Absolute Timeout)
+export const SESSION_ABSOLUTE_TIMEOUT_SECONDS = SESSION_TTL_SECONDS;
+export const SESSION_IDLE_TIMEOUT_SECONDS = 60 * 60 * 4; // 4 hours (Idle Inactivity Timeout)
 
 export interface AuthenticatedUser {
   id: string;
@@ -48,6 +50,7 @@ export async function createSession(
     ipAddress: ipAddress || null,
     userAgent: userAgent || null,
     createdAt: new Date(),
+    lastActiveAt: new Date(),
   });
 
   return { rawToken, expiresAt, sessionId: tokenHash };
@@ -55,7 +58,10 @@ export async function createSession(
 
 /**
  * Validates a session from a raw token.
- * IMMEDIATELY revokes and rejects if the user account has been disabled.
+ * IMMEDIATELY revokes and rejects if:
+ * 1. The account is disabled
+ * 2. Absolute session expiration has passed
+ * 3. Inactivity idle timeout (4 hours) has passed
  */
 export async function validateSession(rawToken: string): Promise<SessionData> {
   if (!rawToken || typeof rawToken !== 'string') {
@@ -71,6 +77,7 @@ export async function validateSession(rawToken: string): Promise<SessionData> {
       sessionId: schema.sessions.id,
       userId: schema.sessions.userId,
       expiresAt: schema.sessions.expiresAt,
+      lastActiveAt: schema.sessions.lastActiveAt,
       id: schema.users.id,
       email: schema.users.email,
       fullName: schema.users.fullName,
@@ -88,10 +95,26 @@ export async function validateSession(rawToken: string): Promise<SessionData> {
 
   const row = result[0];
 
-  // Immediate Revocation Rule: If user is disabled, destroy session immediately!
+  // Immediate Revocation Rule 1: If user is disabled, destroy session immediately!
   if (row.isDisabled) {
     await db.delete(schema.sessions).where(eq(schema.sessions.userId, row.userId));
     throw new UnauthenticatedError('Account has been disabled by an administrator');
+  }
+
+  // Idle Inactivity Timeout Rule 2: Expire session if inactive longer than SESSION_IDLE_TIMEOUT_SECONDS
+  const idleThreshold = new Date(now.getTime() - SESSION_IDLE_TIMEOUT_SECONDS * 1000);
+  if (row.lastActiveAt && row.lastActiveAt < idleThreshold) {
+    await db.delete(schema.sessions).where(eq(schema.sessions.id, tokenHash));
+    throw new UnauthenticatedError('Session has expired due to inactivity');
+  }
+
+  // Touch lastActiveAt if more than 30 seconds have passed since last update
+  if (row.lastActiveAt && now.getTime() - row.lastActiveAt.getTime() > 30000) {
+    await db
+      .update(schema.sessions)
+      .set({ lastActiveAt: now })
+      .where(eq(schema.sessions.id, tokenHash))
+      .catch(() => {});
   }
 
   return {

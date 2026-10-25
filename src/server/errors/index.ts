@@ -70,6 +70,17 @@ export class UniformNotFoundOrForbiddenError extends AppError {
   }
 }
 
+export class NotFoundError extends AppError {
+  constructor(auditReason: string = 'RESOURCE_NOT_FOUND', message: string = 'Resource not found') {
+    super({
+      code: 'NOT_FOUND',
+      statusCode: 404,
+      message,
+      auditReason,
+    });
+  }
+}
+
 export class UnauthenticatedError extends AppError {
   constructor(message: string = 'Authentication required', auditReason: string = 'NO_ACTIVE_SESSION') {
     super({
