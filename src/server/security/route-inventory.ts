@@ -58,6 +58,20 @@ export const ROUTE_INVENTORY: RouteInventoryEntry[] = [
   },
   {
     method: 'POST',
+    pathTemplate: '/api/auth/register',
+    kind: 'auth',
+    expected: {
+      ownerA: 400,
+      ownerB: 400,
+      viewer: 400,
+      admin: 400,
+      anonymous: 400,
+      disabled: 400,
+    },
+    notes: 'Public registration endpoint; probe without body triggers validation error 400.',
+  },
+  {
+    method: 'POST',
     pathTemplate: '/api/auth/logout',
     kind: 'auth',
     expected: {

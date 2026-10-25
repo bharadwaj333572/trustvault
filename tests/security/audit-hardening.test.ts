@@ -226,6 +226,10 @@ describe('PHASE A: Audit Hardening & Cryptographic Integrity', () => {
         methods: ['POST'],
         auditedActions: ['auth.login_success', 'auth.login_failed', 'LOGIN_SUCCESS', 'LOGIN_FAILURE'],
       },
+      'api/auth/register': {
+        methods: ['POST'],
+        auditedActions: ['LOGIN_SUCCESS', 'ACCOUNT_REGISTERED_AND_AUTHENTICATED'],
+      },
       'api/auth/logout': {
         methods: ['POST'],
         auditedActions: ['auth.logout', 'LOGOUT'],

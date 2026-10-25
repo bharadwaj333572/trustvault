@@ -23,6 +23,7 @@ import { loginSeedActors, mintSeedActorTokens, originHeaders, authHeader, ensure
 import { resetIpRateLimitStoreForTests } from '@/server/auth/rate-limit';
 
 import { POST as loginHandler } from '@/app/api/auth/login/route';
+import { POST as registerHandler } from '@/app/api/auth/register/route';
 import { POST as logoutHandler } from '@/app/api/auth/logout/route';
 import { GET as meHandler } from '@/app/api/auth/me/route';
 import { GET as sessionsGet, DELETE as sessionsDelete } from '@/app/api/auth/sessions/route';
@@ -54,6 +55,7 @@ type Handler = (req: NextRequest, ctx?: any) => Promise<Response>;
 
 const HANDLERS: Record<string, Handler> = {
   'POST /api/auth/login': loginHandler,
+  'POST /api/auth/register': registerHandler,
   'POST /api/auth/logout': logoutHandler,
   'GET /api/auth/me': meHandler,
   'GET /api/auth/sessions': sessionsGet,

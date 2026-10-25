@@ -23,12 +23,18 @@ export default function LandingPage() {
             <a href="#demo" className="hover:text-accent transition-colors">Simulation</a>
           </nav>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="btn-industrial bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded flex items-center gap-2"
+              className="btn-industrial bg-ink-light hover:bg-ink-muted text-paper border border-border-dark px-3 py-1.5 rounded text-xs"
             >
-              <span>■ SIGN IN</span>
+              <span>SIGN IN</span>
+            </Link>
+            <Link
+              href="/login?mode=register"
+              className="btn-industrial bg-accent hover:bg-accent-hover text-white px-3.5 py-1.5 rounded text-xs flex items-center gap-1.5"
+            >
+              <span>CREATE ACCOUNT</span>
             </Link>
           </div>
         </div>
@@ -54,18 +60,25 @@ export default function LandingPage() {
 
               <div className="pt-2 flex flex-wrap items-center gap-4">
                 <Link
-                  href="/login"
+                  href="/login?mode=register"
                   className="btn-industrial bg-accent hover:bg-accent-hover text-white px-6 py-3.5 rounded text-xs flex items-center gap-2 shadow-lg"
                 >
-                  <span>■ OPEN THE DEMO</span>
+                  <span>■ CREATE ACCOUNT / REGISTER</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
 
                 <Link
-                  href="/security"
+                  href="/login"
                   className="btn-industrial bg-ink-light hover:bg-ink-muted text-paper border border-border-dark px-6 py-3.5 rounded text-xs flex items-center gap-2"
                 >
-                  <span>READ THREAT MODEL</span>
+                  <span>SIGN IN</span>
+                </Link>
+
+                <Link
+                  href="/security"
+                  className="btn-industrial bg-ink hover:bg-ink-light text-paper-dark hover:text-paper border border-border-dark px-4 py-3.5 rounded text-xs flex items-center gap-2"
+                >
+                  <span>THREAT MODEL</span>
                 </Link>
               </div>
             </div>
